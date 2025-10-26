@@ -2,10 +2,22 @@
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+declare global {
+  interface Window {
+    SpeechRecognition: any;
+    webkitSpeechRecognition: any;
+  }
+}
+
+type SpeechRecognitionEvent = Event & {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+};
+
 const teacherMeta: Record<'spongebob' | 'peter' | 'edna', { name: string; img: string; bubbleColor: string }> = {
-  spongebob: { name: 'spongebob', img: '/images/spongebob.png', bubbleColor: '#FFF7B1' },
-  peter: { name: 'peter griffin', img: '/images/peter.png', bubbleColor: '#FFDCE2' },
-  edna: { name: 'edna mode', img: '/images/edna.png', bubbleColor: '#E9D7FF' }
+  spongebob: { name: 'spongebob', img: '/images/spongebob_neutral.png', bubbleColor: '#FFF7B1' },
+  peter: { name: 'peter griffin', img: '/images/peter_neutral.png', bubbleColor: '#FFDCE2' },
+  edna: { name: 'edna mode', img: '/images/edna_neutral.png', bubbleColor: '#E9D7FF' }
 };
 
 type Props = { teacher: 'spongebob' | 'peter' | 'edna' };
@@ -15,10 +27,9 @@ export default function VoicePanel({ teacher }: Props) {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('Tap and ask a question...');
   const [response, setResponse] = useState('');
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null);
 
-  // @ts-expect-error: window.SpeechRecognition types vary across browsers
-  const SpeechRecognitionImpl: typeof window.SpeechRecognition | undefined = typeof window !== 'undefined' ? (window.SpeechRecognition || (window as any).webkitSpeechRecognition) : undefined;
+  const SpeechRecognitionImpl = typeof window !== 'undefined' ? (window.SpeechRecognition || (window as any).webkitSpeechRecognition) : undefined;
 
   useEffect(() => {
     if (!SpeechRecognitionImpl) return;
@@ -74,7 +85,7 @@ export default function VoicePanel({ teacher }: Props) {
     <div className="flex-1 grid grid-cols-1 md:grid-cols-[auto_1fr] gap-10 items-start">
       <div className="flex flex-col items-center gap-4">
         <div className="relative w-44 h-44 rounded-xl overflow-hidden shadow">
-          <Image src={meta.img} alt={meta.name} fill className="object-cover" />
+          <Image src={meta.img} alt={meta.name} fill className="object-scale-down" />
         </div>
         <button className="voice-button" onClick={startListening} disabled={listening}>
           {listening ? 'Listening...' : 'Ask with your voice'}
