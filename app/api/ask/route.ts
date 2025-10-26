@@ -9,9 +9,9 @@ const PARALLEL_API_KEY = process.env.PARALLEL_API_KEY;
 
 // Teacher personality prompts
 const teacherPrompts: Record<string, string> = {
-  spongebob: `You are SpongeBob SquarePants! Answer questions enthusiastically with nautical references, occasional laughs ("Ahahaha!"), and child-friendly explanations. Use ocean and Bikini Bottom references when appropriate. Keep answers under 100 words and make them fun and educational.`,
-  peter: `You are Peter Griffin from Family Guy! Answer in a casual, somewhat rambling style with pop culture references. Keep it appropriate for kids but maintain Peter's conversational tone. Keep answers under 100 words.`,
-  edna: `You are Dora the Explorer! Answer enthusiastically with encouraging phrases like "¡Excelente!" and "We did it!" Make learning fun and interactive. Keep answers under 100 words.`
+  spongebob: `You are SpongeBob SquarePants explaining things! Keep answers under 50 words. Focus 90% on educational facts and interesting details. Add just a touch of enthusiasm and one brief ocean reference if relevant.`,
+  peter: `You are Peter Griffin explaining things! Keep answers under 50 words. Focus 90% on educational facts and real-world examples. Keep it casual but informative.`,
+  dora: `You are Dora the Explorer explaining things! Keep answers under 50 words. Focus 90% on educational content. Add brief encouraging phrases like "Great question!" sparingly.`
 };
 
 async function searchWeb(question: string): Promise<string> {
@@ -63,7 +63,7 @@ async function searchWeb(question: string): Promise<string> {
 
 export async function POST(request: NextRequest) {
   try {
-    const { question, teacher } = await request.json();
+    const { question, teacher, conversationHistory = [] } = await request.json();
 
     if (!question || !teacher) {
       return NextResponse.json(
@@ -78,24 +78,47 @@ export async function POST(request: NextRequest) {
     // Get personality prompt
     const systemPrompt = teacherPrompts[teacher] || teacherPrompts.spongebob;
 
-    // Call Claude with web context
-    const message = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: `Question: ${question}\n\nWeb Context:\n${webContext}\n\nPlease answer the question using the web context provided, in your character's voice.`,
-        },
-      ],
+    // Build context messages with conversation history
+    const messages: Array<{ role: 'user' | 'assistant', content: string }> = [];
+    conversationHistory.forEach((turn: { question: string, answer: string }) => {
+      messages.push({ role: 'user', content: turn.question });
+      messages.push({ role: 'assistant', content: turn.answer });
+    });
+    messages.push({
+      role: 'user',
+      content: `Question: ${question}\n\nWeb Context:\n${webContext}\n\nPlease answer the question using the web context provided, in your character's voice. Keep answers under 50 words.`,
     });
 
-    const answer = message.content[0].type === 'text' 
-      ? message.content[0].text 
-      : 'Sorry, I could not generate an answer.';
+    // Call Claude with streaming (web context from Parallel API + extended thinking via Sonnet)
+    const stream = anthropic.messages.stream({
+      model: 'claude-sonnet-4-5',
+      max_tokens: 1024,
+      system: `${systemPrompt}\nAlso, after answering, provide:
+1. A concise concept label (2-4 words) in format: <concept: LABEL>
+2. A one-sentence summary (10-15 words) in format: <summary: SUMMARY>`,
+      messages,
+    });
 
-    return NextResponse.json({ answer });
+    // Return streaming response
+    const encoder = new TextEncoder();
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of stream) {
+            if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+              controller.enqueue(encoder.encode(chunk.delta.text));
+            }
+          }
+          controller.close();
+        } catch (error) {
+          controller.error(error);
+        }
+      }
+    });
+
+    return new Response(readableStream, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+    });
   } catch (error: any) {
     console.error('Ask API error:', error);
     return NextResponse.json(

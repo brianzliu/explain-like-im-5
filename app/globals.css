@@ -10,3 +10,11 @@ body { @apply bg-[var(--bg)] text-gray-900 antialiased; }
 .card { @apply bg-white rounded-2xl shadow-card; }
 .voice-button { @apply bg-brand text-white rounded-full px-6 py-3 font-semibold shadow hover:bg-brand-dark active:scale-95 transition; }
 
+/* Chat aesthetics */
+.bubble {
+  @apply rounded-2xl p-5 shadow border border-gray-100 bg-white/90;
+}
+.bottom-mic {
+  @apply fixed bottom-6 left-1/2 -translate-x-1/2 h-16 w-16 rounded-full text-white shadow-xl ring-4 ring-white/40 grid place-items-center;
+}
+

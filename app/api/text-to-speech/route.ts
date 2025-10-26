@@ -26,13 +26,16 @@ export async function POST(request: NextRequest) {
     // Generate speech with ElevenLabs
     const audio = await elevenlabs.textToSpeech.convert(voiceId, {
       text,
-      model_id: 'eleven_multilingual_v2',
+      modelId: 'eleven_multilingual_v2',
     });
 
-    // Convert the async iterable to a buffer
-    const chunks: Buffer[] = [];
-    for await (const chunk of audio) {
-      chunks.push(chunk);
+    // Convert the ReadableStream to a buffer
+    const reader = audio.getReader();
+    const chunks: Uint8Array[] = [];
+    let result = await reader.read();
+    while (!result.done) {
+      chunks.push(result.value);
+      result = await reader.read();
     }
     const audioBuffer = Buffer.concat(chunks);
 

@@ -1,0 +1,39 @@
+// Prisma schema for Explain-like-I'm-5 app
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Chat {
+  id        String   @id @default(cuid())
+  teacher   String
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  turns     Turn[]
+}
+
+model Turn {
+  id        String   @id @default(cuid())
+  chatId    String
+  chat      Chat     @relation(fields: [chatId], references: [id])
+  question  String
+  answer    String
+  concept   String
+  summary   String   @default("")
+  audioId   String?
+  createdAt DateTime @default(now())
+}
+
+model AudioClip {
+  id        String   @id @default(cuid())
+  mimeType  String
+  data      Bytes
+  createdAt DateTime @default(now())
+}
+
+
